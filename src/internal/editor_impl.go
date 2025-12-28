@@ -5,19 +5,14 @@ import (
 	"os"
 	"strings"
 
-	src "text_editor"
-
 	gc "github.com/gbin/goncurses"
+
+	src "text_editor"
 )
 
 const (
 	// rw-rw-rw-
 	cReadWriteFileMode = 0666
-
-	// Dimensions.
-	cMaxWidth    = 100
-	cMaxHeight   = 10
-	cDebugHeight = 5
 
 	// Colors.
 	cDebugColor = 1
@@ -31,7 +26,6 @@ func NewEditor(window *gc.Window, filePath string) (src.Editor, error) {
 	e := &editorImpl{window: window, file: file}
 
 	gc.InitPair(cDebugColor, gc.C_RED, gc.C_BLACK)
-	window.Resize(cMaxHeight+cDebugHeight, cMaxWidth)
 	// Initial update of window.
 	e.sync()
 	return e, nil
@@ -40,6 +34,9 @@ func NewEditor(window *gc.Window, filePath string) (src.Editor, error) {
 type editorImpl struct {
 	window *gc.Window
 	file   *os.File
+
+	// Immutable state.
+	maxHeight, maxWidth int
 
 	// Mutable state.
 	lineLengths      []int // How many chars on are on the ith line of the file.
@@ -74,10 +71,15 @@ func (e *editorImpl) Close() {
 
 func (e *editorImpl) moveCursor(dy int, dx int) {
 	cursorY, cursorX := e.window.CursorYX()
+	maxY, maxX := e.window.MaxYX()
 	newY, newX := cursorY+dy, cursorX+dx
-	if newY < 0 || newY >= cMaxHeight || newX < 0 || newX >= cMaxWidth {
+	if newY < 0 || newY >= maxY || newX < 0 || newX >= maxX {
 		// Don't go off-screen.
 		return
+	}
+	if newY >= len(e.lineLengths) {
+		// Don't go past the last line in the file.
+		newY = len(e.lineLengths) - 1
 	}
 	if newX >= e.lineLengths[newY] {
 		// Don't go past the last char in the current line.
@@ -111,19 +113,28 @@ func (e *editorImpl) updateWindowStub() {
 func (e *editorImpl) updateWindow() {
 	contents := e.getFileContents()
 	lineLengths := make([]int, len(contents))
-	for i, row := range contents {
-		e.window.Println(row)
-		lineLengths[i] = len(row)
+	maxY, _ := e.window.MaxYX()
+	for i := range maxY {
+		if i < len(contents) {
+			line := contents[i]
+			lineLengths[i] = len(line)
+			e.window.Println(line)
+		} else {
+			// Empty lines get special UI.
+			e.window.AttrOn(gc.A_DIM)
+			e.window.Println("~")
+			e.window.AttrOff(gc.A_DIM)
+		}
 	}
 	e.lineLengths = lineLengths
 	e.window.Println()
 	if e.verbose {
 		// Print debug output.
 		e.window.ColorOn(cDebugColor)
-		e.window.Println("DEBUG:")
-		e.window.Printf("file has %d lines\n", len(contents))
-		e.window.Printf("current line has %d chars\n", len(contents[e.cursorY]))
-		e.window.Printf("cursor is at (x=%d,y=%d)\n", e.cursorX, e.cursorY)
+		e.window.Println("DEBUG: ")
+		e.window.Printf("file has %d lines; ", len(contents))
+		e.window.Printf("current line has %d chars; ", len(contents[e.cursorY]))
+		e.window.Printf("cursor is at (x=%d,y=%d)", e.cursorX, e.cursorY)
 		e.window.ColorOff(cDebugColor)
 	}
 }
@@ -137,14 +148,12 @@ func (e *editorImpl) getFileContents() []string {
 		panic(err)
 	}
 
-	fileContents := make([]string, cMaxHeight)
-	currRowInd := 0
+	fileContents := []string{}
 	currRow := strings.Builder{}
 	for _, b := range contents {
 		if b == '\n' {
 			// Line break, meaning we update a new row.
-			fileContents[currRowInd] = currRow.String()
-			currRowInd++
+			fileContents = append(fileContents, currRow.String())
 			currRow = strings.Builder{}
 		} else {
 			currRow.WriteByte(b)
