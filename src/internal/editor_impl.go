@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"io"
 	"os"
 	src "text_editor"
@@ -34,7 +35,8 @@ type editorImpl struct {
 	file *os.File
 
 	// Mutable state.
-	cursor location
+	cursor  location
+	verbose bool
 }
 
 var _ src.Editor = (*editorImpl)(nil)
@@ -59,9 +61,8 @@ func (e *editorImpl) Handle(ch rune) error {
 			break
 		}
 		e.cursor.y--
-	case 'q':
-		e.Close()
-		panic("Closed")
+	case 'v':
+		e.verbose = !e.verbose
 	}
 	e.sync()
 	return nil
@@ -102,6 +103,15 @@ func (e *editorImpl) updateWindow() {
 			}
 		}
 		bytes = append(bytes, '\n')
+	}
+	if e.verbose {
+		// Print debug output.
+		bytes = append(bytes, []byte("DEBUG:")...)
+		bytes = append(bytes, []byte(fmt.Sprintf("contents is length %d", len(contents)))...)
+		for _, line := range contents {
+			bytes = append(bytes, []byte(string(line))...)
+			bytes = append(bytes, '\n')
+		}
 	}
 	_, err := os.Stdout.Write(bytes)
 	if err != nil {
