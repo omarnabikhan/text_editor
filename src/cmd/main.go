@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,9 +13,25 @@ import (
 )
 
 func main() {
-	verbose := flag.Bool("v", false, "enter in verbose mode (show debug data)")
-	filePath := flag.String("f", "", "which file to open")
+	filePath := ""
+	verbose := false
+	help := false
+
+	flag.StringVar(&filePath, "f", "", "which file to open")
+	flag.BoolVar(&help, "h", false, "show usage and exit")
+	flag.BoolVar(&verbose, "v", false, "enter in verbose mode (optional)")
 	flag.Parse()
+
+	if help {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	if len(filePath) == 0 {
+		fmt.Println("file must be provided via -f flag")
+		flag.Usage()
+		os.Exit(1)
+	}
 
 	window, _ := gc.Init()
 	defer gc.End()
@@ -23,7 +40,7 @@ func main() {
 	gc.CBreak(true)
 	gc.StartColor()
 
-	editor, err := internal.NewEditor(window, *filePath, *verbose)
+	editor, err := internal.NewEditor(window, filePath, verbose)
 	if err != nil {
 		panic(err)
 	}
