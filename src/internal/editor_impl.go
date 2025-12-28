@@ -121,43 +121,44 @@ func (e *editorImpl) sync() {
 		}
 		e.window.Move(e.cursorY, newX)
 	}()
-	e.clearDisplay()
 	e.updateWindow()
 }
 
-func (e *editorImpl) clearDisplay() {
-	e.window.Erase()
-}
-
 func (e *editorImpl) updateWindow() {
+	// Update the window atomically by replacing it. This is more efficient than multiple Print calls
+	// on the user-visible window, which may result in flashes.
+	windowY, windowX := e.window.YX()
+	maxY, maxX := e.window.MaxYX()
+	newWindow, _ := gc.NewWindow(maxY, maxX, windowY, windowX)
+
 	contents := e.getFileContents()
 	lineLengths := make([]int, len(contents))
-	maxY, _ := e.window.MaxYX()
 	for i := range maxY {
 		if i < len(contents) {
 			line := contents[i]
 			lineLengths[i] = len(line)
-			e.window.Println(line)
+			newWindow.Println(line)
 		} else if i != maxY-1 {
 			// There are no more file contents, so use a special UI to denote that these liens are
 			// not present in the file. We do not do that on the last line, as the last line is used
 			// for debug output.
-			e.window.AttrOn(gc.A_DIM)
-			e.window.Println("~")
-			e.window.AttrOff(gc.A_DIM)
+			newWindow.AttrOn(gc.A_DIM)
+			newWindow.Println("~")
+			newWindow.AttrOff(gc.A_DIM)
 		}
 	}
 	e.lineLengths = lineLengths
 	e.window.Println()
 	if e.verbose {
 		// Print debug output.
-		e.window.ColorOn(cDebugColor)
-		e.window.Println("DEBUG: ")
-		e.window.Printf("file has %d lines; ", len(contents))
-		e.window.Printf("current line has %d chars; ", len(contents[e.cursorY]))
-		e.window.Printf("cursor is at (x=%d,y=%d)", e.cursorX, e.cursorY)
-		e.window.ColorOff(cDebugColor)
+		newWindow.ColorOn(cDebugColor)
+		newWindow.Println("DEBUG: ")
+		newWindow.Printf("file has %d lines; ", len(contents))
+		newWindow.Printf("current line has %d chars; ", len(contents[e.cursorY]))
+		newWindow.Printf("cursor is at (x=%d,y=%d)", e.cursorX, e.cursorY)
+		newWindow.ColorOff(cDebugColor)
 	}
+	e.window.Overwrite(newWindow)
 }
 
 // Each string is the entire row. The row does NOT contain the ending newline.
