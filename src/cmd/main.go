@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,8 +12,9 @@ import (
 )
 
 func main() {
-	// TODO(omar): Proper flag management. For now, arg 1 is the file name to edit (arg 0 is program
-	// name always).
+	verbose := flag.Bool("v", false, "enter in verbose mode (show debug data)")
+	filePath := flag.String("f", "", "which file to open")
+	flag.Parse()
 
 	window, _ := gc.Init()
 	defer gc.End()
@@ -21,7 +23,7 @@ func main() {
 	gc.CBreak(true)
 	gc.StartColor()
 
-	editor, err := internal.NewEditor(window, os.Args[1])
+	editor, err := internal.NewEditor(window, *filePath, *verbose)
 	if err != nil {
 		panic(err)
 	}

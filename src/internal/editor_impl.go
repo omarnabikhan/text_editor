@@ -18,12 +18,12 @@ const (
 	cDebugColor = 1
 )
 
-func NewEditor(window *gc.Window, filePath string) (src.Editor, error) {
+func NewEditor(window *gc.Window, filePath string, verbose bool) (src.Editor, error) {
 	file, err := os.OpenFile(filePath, os.O_RDWR, cReadWriteFileMode)
 	if err != nil {
 		return nil, err
 	}
-	e := &editorImpl{window: window, file: file}
+	e := &editorImpl{window: window, file: file, verbose: verbose}
 
 	gc.InitPair(cDebugColor, gc.C_RED, gc.C_BLACK)
 	// Initial update of window.
