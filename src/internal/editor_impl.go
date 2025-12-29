@@ -9,7 +9,7 @@ import (
 
 	gc "github.com/gbin/goncurses"
 
-	"github.com/omarnabikhan/text_editor/src"
+	"github.com/omarnabikhan/gim/src"
 )
 
 type EditorMode string

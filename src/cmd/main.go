@@ -10,7 +10,7 @@ import (
 
 	gc "github.com/gbin/goncurses"
 
-	"github.com/omarnabikhan/text_editor/src/internal"
+	"github.com/omarnabikhan/gim/src/internal"
 )
 
 func Main() {
