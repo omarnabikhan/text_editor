@@ -1,0 +1,7 @@
+There is some content in here
+Even on this line!
+not-blank
+also
+
+And that is a blank line
+And now, we have the longest line in the file.
