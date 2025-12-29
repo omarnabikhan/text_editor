@@ -27,7 +27,9 @@ $ gim <someFile>
 
 Development
 --
-Assuming you've cloned this repo and are in the root directory, run the `build_dev.sh` script to build the binary locally and add it to your PATH:
+Assuming you've cloned this repo and are in the root directory, run the `build_dev.sh` script to build the binary locally and add to your PATH.
+Be sure that your GOBIN env var (usually`~/go/bin`) is in your PATH already, since this just runs `$ go install .` under the hood which copies
+the executable to GOBIN
 ```
 $ ./build_dev.sh
 ```
