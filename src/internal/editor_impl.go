@@ -42,14 +42,14 @@ func NewEditor(window *gc.Window, filePath string, verbose bool) (src.Editor, er
 		return nil, err
 	}
 
-	fileContents := getFileContents(file)
+	fileContents, lengthBytes := getFileContentsAndLen(file)
 	e := &editorImpl{
 		window:       window,
 		file:         file,
 		fileContents: fileContents,
 		mode:         NORMAL_MODE,
 		verbose:      verbose,
-		userMsg:      file.Name(),
+		userMsg:      fmt.Sprintf(`file "%s" %dL %dB`, file.Name(), len(fileContents), lengthBytes),
 	}
 
 	gc.InitColor(COLOR_DEFAULT, 900, 900, 900)
@@ -339,7 +339,7 @@ func (e *editorImpl) normalizeCursorX(x int) int {
 }
 
 // Each string is the entire row. The row does NOT contain the ending newline.
-func getFileContents(file *os.File) []string {
+func getFileContentsAndLen(file *os.File) ([]string, int) {
 	// Make sure file is being read from beginning.
 	file.Seek(0 /*offset*/, io.SeekStart)
 	contents, err := io.ReadAll(file)
@@ -358,5 +358,5 @@ func getFileContents(file *os.File) []string {
 			currRow.WriteByte(b)
 		}
 	}
-	return fileContents
+	return fileContents, len(contents)
 }
