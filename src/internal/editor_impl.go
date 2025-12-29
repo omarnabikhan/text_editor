@@ -158,7 +158,6 @@ func (e *editorImpl) handleNormal(key gc.Key) error {
 				e.fileContents[currLineInd:]...,
 			)...,
 		)
-		//e.moveCursorVertical(-1)
 		e.swapToInsertMode()
 		return nil
 	case "i":
@@ -359,6 +358,15 @@ func (e *editorImpl) handleCommand(key gc.Key) error {
 		// Cancel the command.
 		e.userMsg = ""
 		e.mode = NORMAL_MODE
+		return nil
+	case DELETE_KEY:
+		// Delete the last char in the command. If the command is empty, then swap to NORMAL mode too.
+		if len(e.userMsg) == 1 {
+			e.userMsg = ""
+			e.mode = NORMAL_MODE
+			return nil
+		}
+		e.userMsg = e.userMsg[:len(e.userMsg)-1]
 		return nil
 	case "enter":
 		// Trim the beginning ":"
