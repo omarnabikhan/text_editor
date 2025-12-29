@@ -14,11 +14,9 @@ import (
 )
 
 func Main() {
-	filePath := ""
 	verbose := false
 	help := false
 
-	flag.StringVar(&filePath, "f", "", "which file to open")
 	flag.BoolVar(&help, "h", false, "show usage and exit")
 	flag.BoolVar(&verbose, "v", false, "enter in verbose mode (optional)")
 	flag.Parse()
@@ -28,8 +26,9 @@ func Main() {
 		os.Exit(0)
 	}
 
+	filePath := os.Args[(len(os.Args) - 1)]
 	if len(filePath) == 0 {
-		fmt.Println("file must be provided via -f flag")
+		fmt.Println("file path must be provided as last arg")
 		flag.Usage()
 		os.Exit(1)
 	}
