@@ -1,3 +1,9 @@
+Gim
+--
+Gim is a Vim implementation in Go.
+
+Motivation
+--
 Just for fun. I like Vim a lot, and text editors in general are fasincating to me. So I'm experimenting with implementing my own here, purely in Go.
 
 Here's a fun update: I can now reasonably edit, save, and work with this README all in my editor built from scratch!
@@ -33,4 +39,7 @@ the executable to GOBIN
 ```
 $ ./build_dev.sh
 ```
-`
+
+On contributions
+--
+No AI code here. This whole thing is a fun side-project to me, so productivity isn't something I'm thinking about.
