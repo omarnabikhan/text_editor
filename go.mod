@@ -1,4 +1,4 @@
-module text_editor
+module github.com/omarnabikhan/text_editor
 
 go 1.25.1
 
