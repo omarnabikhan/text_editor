@@ -312,7 +312,7 @@ func (e *editorImpl) deleteChar() {
 		e.fileContents[currLineInd-1] = newLine.String()
 		// Remove the current line.
 		e.fileContents = append(e.fileContents[:currLineInd], e.fileContents[currLineInd+1:]...)
-		e.cursorY -= 1
+		e.moveCursorVertical(-1)
 		e.cursorX = len(prevLine)
 		return
 	}
@@ -320,7 +320,7 @@ func (e *editorImpl) deleteChar() {
 	newLine.WriteString(currLine[:e.cursorX-1])
 	newLine.WriteString(currLine[e.cursorX:])
 	e.fileContents[currLineInd] = newLine.String()
-	e.cursorX -= 1
+	e.moveCursorHorizontal(-1)
 }
 
 // Handle the user inputting the ch key.
@@ -349,7 +349,7 @@ func (e *editorImpl) insertChar(ch string) {
 	newLine.WriteString(ch)
 	newLine.WriteString(currLine[e.cursorX:])
 	e.fileContents[currLineInd] = newLine.String()
-	e.cursorX += 1
+	e.moveCursorHorizontal(1)
 }
 
 func (e *editorImpl) handleCommand(key gc.Key) error {
