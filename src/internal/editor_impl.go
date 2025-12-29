@@ -70,11 +70,12 @@ type editorImpl struct {
 	file   *os.File
 
 	// Mutable state.
-	mode             EditorMode
 	fileContents     []string // Each element is a line from the source file without ending in '\n'.
+	fileLineOffset   int      // Which line of the file is being shown on the top of the screen.
+	userMsg          string   // Shown to user at bottom of screen.
+	mode             EditorMode
 	verbose          bool
 	cursorX, cursorY int
-	userMsg          string // Shown to user at bottom of screen.
 }
 
 var _ src.Editor = (*editorImpl)(nil)
@@ -178,6 +179,9 @@ func (e *editorImpl) moveCursorIncremental(dy int, dx int) {
 // x-pos on shorter lines so that when we return to larger lines, the x-pos "pops" back to 30.
 func (e *editorImpl) moveCursor(newY int, newX int) {
 	maxY, maxX := e.window.MaxYX()
+	if newY >= maxY {
+		panic("oops")
+	}
 	if newY < 0 || newY >= maxY || newY >= len(e.fileContents) ||
 		newX < 0 || newX >= maxX {
 		// Don't go off-screen.
@@ -205,6 +209,13 @@ func (e *editorImpl) moveCursor(newY int, newX int) {
 // Write the contents of the in-memory file to disc.
 func (e *editorImpl) writeToDisc() error {
 	defer e.file.Sync()
+
+	// Clear the contents of the file.
+	if err := os.Truncate(e.file.Name(), 0); err != nil {
+		return err
+	}
+
+	// Write the new contents of file to disc.
 	e.file.Seek(0 /*offset*/, io.SeekStart)
 	// We collect in a []byte and do a single write for efficiency.
 	contents := bytes.Buffer{}
@@ -322,7 +333,8 @@ func (e *editorImpl) updateWindow() {
 	maxY, maxX := e.window.MaxYX()
 	newWindow, _ := gc.NewWindow(maxY, maxX, windowY, windowX)
 	newWindow.SetBackground(COLOR_PAIR_DEFAULT)
-	for i := range maxY {
+	for i := range maxY - 2 {
+		// We reserve the bottom 2 lines for user messages, and debug messages.
 		if i < len(e.fileContents) {
 			line := e.fileContents[i]
 			newWindow.Println(line)
@@ -347,6 +359,9 @@ func (e *editorImpl) updateWindow() {
 		newWindow.Printf("mode=%s", e.mode)
 		newWindow.Println()
 		newWindow.ColorOff(COLOR_PAIR_DEBUG)
+	} else {
+		// Print a newline anyways so no shifts when user toggles verbosity.
+		newWindow.Println()
 	}
 	newWindow.Println(e.userMsg)
 
