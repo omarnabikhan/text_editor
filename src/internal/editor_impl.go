@@ -159,6 +159,11 @@ func (e *editorImpl) handleNormal(key gc.Key) error {
 		)
 		e.swapToInsertMode()
 		return nil
+	case "a":
+		// Swap to INSERT mode, and increment the cursor's x-pos.
+		e.swapToInsertMode()
+		e.moveCursorHorizontal(1)
+		return nil
 	case "i":
 		// Swap to INSERT mode.
 		e.swapToInsertMode()
