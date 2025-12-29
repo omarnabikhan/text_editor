@@ -10,6 +10,7 @@ import (
 	gc "github.com/gbin/goncurses"
 
 	"github.com/omarnabikhan/gim/src"
+	"github.com/omarnabikhan/gim/src/internal/build_version"
 )
 
 type EditorMode string
@@ -339,6 +340,7 @@ func (e *editorImpl) updateWindow() {
 		// Print debug output.
 		newWindow.ColorOn(COLOR_PAIR_DEBUG)
 		newWindow.Print("DEBUG: ")
+		newWindow.Printf("build version %s; ", build_version.GetVersion())
 		newWindow.Printf("file length=%d lines; ", len(e.fileContents))
 		newWindow.Printf("current line length=%d chars; ", len(e.fileContents[e.cursorY]))
 		newWindow.Printf("cursor at (x=%d,y=%d); ", e.cursorX, e.cursorY)
