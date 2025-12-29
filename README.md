@@ -12,3 +12,15 @@ going to challenge myself to come up with features not in VIM that I think are u
 The most painful thing so far has been using Colors.
 
 This README has become more of a blog. Maybe I'll update it in a future commit, but for now here it is.
+
+Installation
+--
+
+```sh
+$ go install github.com/omarnabikhan/gim
+```
+
+Now, you can just use it however you'd use vim.
+```sh
+$ gim <someFile>
+```
