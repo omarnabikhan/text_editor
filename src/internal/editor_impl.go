@@ -77,24 +77,88 @@ func (e *editorImpl) Handle(key gc.Key) error {
 func (e *editorImpl) handleNormal(key gc.Key) error {
 	switch k := gc.KeyString(key); k {
 	case "q":
+		// Quit the program.
 		e.Close()
 		return io.EOF
 	case "j":
+		// Move the cursor down.
 		e.moveCursorIncremental(1 /*dy*/, 0 /*dx*/)
+		return nil
 	case "k":
+		// Move the cursor up.
 		e.moveCursorIncremental(-1 /*dy*/, 0 /*dx*/)
+		return nil
 	case "l":
+		// Move the cursor right.
 		e.moveCursorIncremental(0 /*dy*/, 1 /*dx*/)
+		return nil
 	case "h":
+		// Move the cursor left.
 		e.moveCursorIncremental(0 /*dy*/, -1 /*dx*/)
+		return nil
 	case "0":
+		// Move the cursor to the beginning of the current line.
 		e.cursorX = 0
+		return nil
 	case "v":
+		// Toggle verbose mode.
 		e.verbose = !e.verbose
+		return nil
 	case "i":
+		// Swap to INSERT mode.
 		e.cursorX = e.normalizeCursorX(e.cursorX)
 		e.mode = INSERT_MODE
+		return nil
+	case "w":
+		// Write the contents of the in-memory buffer to disc.
+		return e.writeToDisc()
+	default:
+		// Do nothing.
+		return nil
 	}
+}
+
+func (e *editorImpl) moveCursorIncremental(dy int, dx int) {
+	e.moveCursor(e.cursorY+dy, e.cursorX+dx)
+}
+
+// moveCursor handles the validation of the new cursor location, and applies safeguards if the cursor
+// is attempted to be moved to an invalid position.
+//
+// The cursor's x-position that is stored here is not the actual position the cursor occupies. Instead,
+// it's treated as the max possible position it may occupy, limited by the current line's length.
+// For example, say the current line has 40 chars, and the cursor's x-pos is 30. If the cursor moves
+// to a line with fewer chars, say 10, the stored x-pos is still 30, even though the cursor would
+// actually occupy an x-pos of 9 (the max possible on a line of length 10). This is to preserve the
+// x-pos on shorter lines so that when we return to larger lines, the x-pos "pops" back to 30.
+func (e *editorImpl) moveCursor(newY int, newX int) {
+	maxY, maxX := e.window.MaxYX()
+	if newY < 0 || newY >= maxY || newY >= len(e.fileContents) ||
+		newX < 0 || newX >= maxX {
+		// Don't go off-screen.
+		// Don't go past the last line in the file.
+		return
+	}
+	lineLength := len(e.fileContents[newY])
+	if newX >= lineLength {
+		// The newX is past the last char on the current line. That is valid (see the doc comment),
+		// though we don't want to go any further than we are now.
+		// So, if the x-pos is increasing, do not update it at all (set it to what it is currently).
+		// Otherwise, if it's decreasing, set it to the second-to-last char on the current line. We
+		// move it to the second-to-last instead of the last since the cursor is on the last char
+		// from user's perspective.
+		// Additionally, if the current line is empty, don't move it at all.
+		if newX >= e.cursorX || lineLength == 0 {
+			newX = e.cursorX
+		} else {
+			newX = lineLength - 2
+		}
+	}
+	e.cursorY, e.cursorX = newY, newX
+}
+
+func (e *editorImpl) writeToDisc() error {
+	// TODO(omar): implement
 	return nil
 }
 
@@ -102,14 +166,17 @@ func (e *editorImpl) handleInsert(key gc.Key) error {
 	ch := gc.KeyString(key)
 	switch ch {
 	case ESC_KEY:
-		// Swapping to NORMAL mode also decrements the x-pos by 1.
+		// Swap to NORMAL model
+		// Swapping decrements the x-pos by 1.
 		e.mode = NORMAL_MODE
 		e.cursorX = e.normalizeCursorX(e.cursorX - 1)
 		return nil
 	case DELETE_KEY:
+		// Delete the char before the cursor.
 		e.deleteChar()
 		return nil
 	default:
+		// Insert a char at the cursor.
 		e.insertChar(ch)
 		return nil
 	}
@@ -180,63 +247,12 @@ func (e *editorImpl) Close() {
 	e.file.Close()
 }
 
-func (e *editorImpl) moveCursorIncremental(dy int, dx int) {
-	e.moveCursor(e.cursorY+dy, e.cursorX+dx)
-}
-
-// moveCursor handles the validation of the new cursor location, and applies safeguards if the cursor
-// is attempted to be moved to an invalid position.
-//
-// The cursor's x-position that is stored here is not the actual position the cursor occupies. Instead,
-// it's treated as the max possible position it may occupy, limited by the current line's length.
-// For example, say the current line has 40 chars, and the cursor's x-pos is 30. If the cursor moves
-// to a line with fewer chars, say 10, the stored x-pos is still 30, even though the cursor would
-// actually occupy an x-pos of 9 (the max possible on a line of length 10). This is to preserve the
-// x-pos on shorter lines so that when we return to larger lines, the x-pos "pops" back to 30.
-func (e *editorImpl) moveCursor(newY int, newX int) {
-	maxY, maxX := e.window.MaxYX()
-	if newY < 0 || newY >= maxY || newY >= len(e.fileContents) ||
-		newX < 0 || newX >= maxX {
-		// Don't go off-screen.
-		// Don't go past the last line in the file.
-		return
-	}
-	lineLength := len(e.fileContents[newY])
-	if newX >= lineLength {
-		// The newX is past the last char on the current line. That is valid (see the doc comment),
-		// though we don't want to go any further than we are now.
-		// So, if the x-pos is increasing, do not update it at all (set it to what it is currently).
-		// Otherwise, if it's decreasing, set it to the second-to-last char on the current line. We
-		// move it to the second-to-last instead of the last since the cursor is on the last char
-		// from user's perspective.
-		// Additionally, if the current line is empty, don't move it at all.
-		if newX >= e.cursorX || lineLength == 0 {
-			newX = e.cursorX
-		} else {
-			newX = lineLength - 2
-		}
-	}
-	e.cursorY, e.cursorX = newY, newX
-}
-
 func (e *editorImpl) sync() {
 	defer e.window.Refresh()
 	defer func() {
 		e.window.Move(e.cursorY, e.normalizeCursorX(e.cursorX))
 	}()
 	e.updateWindow()
-}
-
-func (e *editorImpl) normalizeCursorX(x int) int {
-	// In INSERT mode, it's expected for the cursor to be equal to the length of the current line.
-	if e.mode == NORMAL_MODE && e.cursorX >= len(e.fileContents[e.cursorY]) {
-		// Special handling of x-position. See moveCursorInternal for details.
-		x = len(e.fileContents[e.cursorY]) - 1
-	}
-	if x < 0 {
-		x = 0
-	}
-	return x
 }
 
 func (e *editorImpl) updateWindow() {
@@ -271,6 +287,18 @@ func (e *editorImpl) updateWindow() {
 		newWindow.ColorOff(COLOR_DEBUG)
 	}
 	e.window.Overwrite(newWindow)
+}
+
+func (e *editorImpl) normalizeCursorX(x int) int {
+	// In INSERT mode, it's expected for the cursor to be equal to the length of the current line.
+	if e.mode == NORMAL_MODE && e.cursorX >= len(e.fileContents[e.cursorY]) {
+		// Special handling of x-position. See moveCursorInternal for details.
+		x = len(e.fileContents[e.cursorY]) - 1
+	}
+	if x < 0 {
+		x = 0
+	}
+	return x
 }
 
 // Each string is the entire row. The row does NOT contain the ending newline.
