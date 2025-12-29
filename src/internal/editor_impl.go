@@ -132,6 +132,17 @@ func (e *editorImpl) handleNormal(key gc.Key) error {
 		e.cursorY += 1
 		e.swapToInsertMode()
 		return nil
+	case "O":
+		// Insert an empty line before the current line, and swap to INSERT mode.
+		e.fileContents = append(
+			e.fileContents[:e.cursorY],
+			append(
+				[]string{""},
+				e.fileContents[e.cursorY:]...,
+			)...,
+		)
+		e.swapToInsertMode()
+		return nil
 	case "i":
 		// Swap to INSERT mode.
 		e.swapToInsertMode()
