@@ -92,7 +92,6 @@ func (e *editorImpl) handleNormal(key gc.Key) error {
 	case "v":
 		e.verbose = !e.verbose
 	case "i":
-		// Before entering INSERT mode, we must fix the cursor x-pos.
 		e.cursorX = e.normalizeCursorX(e.cursorX)
 		e.mode = INSERT_MODE
 	}
@@ -103,7 +102,9 @@ func (e *editorImpl) handleInsert(key gc.Key) error {
 	ch := gc.KeyString(key)
 	switch ch {
 	case ESC_KEY:
+		// Swapping to NORMAL mode also decrements the x-pos by 1.
 		e.mode = NORMAL_MODE
+		e.cursorX = e.normalizeCursorX(e.cursorX - 1)
 		return nil
 	case DELETE_KEY:
 		e.deleteChar()
@@ -115,15 +116,35 @@ func (e *editorImpl) handleInsert(key gc.Key) error {
 }
 
 // Delete the character BEFORE the cursor position, and decrement the x-position by one.
+// If the cursor is at the beginning of the line (x-pos = 0) and not on the first line (y-pos > 0),
+// this is a special case and we:
+// 1. Copy the entire contents of that line to the previous line.
+// 2. Delete the current line (modify number of lines in file).
+// 3. Decrement the cursor's y-pos by 1.
+// 4. Update the cursor's x-pos to be whatever the end of the previous line was.
 func (e *editorImpl) deleteChar() {
-	lineToInsertInto := e.fileContents[e.cursorY]
-	if len(lineToInsertInto) == 0 {
-		// Empty line: do nothing.
+	currLine := e.fileContents[e.cursorY]
+	if e.cursorX == 0 && e.cursorY == 0 {
+		// Do nothing.
+		return
+	}
+	if e.cursorX == 0 {
+		// Special case. See docstring.
+		prevLine := e.fileContents[e.cursorY-1]
+		newLine := strings.Builder{}
+		newLine.WriteString(prevLine)
+		newLine.WriteString(currLine)
+		// Replace the previous line.
+		e.fileContents[e.cursorY-1] = newLine.String()
+		// Remove the current line.
+		e.fileContents = append(e.fileContents[:e.cursorY], e.fileContents[e.cursorY+1:]...)
+		e.cursorY -= 1
+		e.cursorX = len(prevLine)
 		return
 	}
 	newLine := strings.Builder{}
-	newLine.WriteString(lineToInsertInto[:e.cursorX-1])
-	newLine.WriteString(lineToInsertInto[e.cursorX:])
+	newLine.WriteString(currLine[:e.cursorX-1])
+	newLine.WriteString(currLine[e.cursorX:])
 	e.fileContents[e.cursorY] = newLine.String()
 	e.cursorX -= 1
 }
@@ -191,7 +212,8 @@ func (e *editorImpl) sync() {
 }
 
 func (e *editorImpl) normalizeCursorX(x int) int {
-	if e.cursorX >= len(e.fileContents[e.cursorY]) {
+	// In INSERT mode, it's expected for the cursor to be equal to the length of the current line.
+	if e.mode == NORMAL_MODE && e.cursorX >= len(e.fileContents[e.cursorY]) {
 		// Special handling of x-position. See moveCursorInternal for details.
 		x = len(e.fileContents[e.cursorY]) - 1
 	}
