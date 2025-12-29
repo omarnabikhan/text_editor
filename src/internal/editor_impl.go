@@ -29,8 +29,9 @@ const (
 	COLOR_PAIR_DEFAULT = 2
 
 	// Editor modes.
-	NORMAL_MODE EditorMode = "NORMAL"
-	INSERT_MODE EditorMode = "INSERT"
+	NORMAL_MODE  EditorMode = "NORMAL"
+	INSERT_MODE  EditorMode = "INSERT"
+	COMMAND_MODE EditorMode = "COMMAND"
 
 	// Escape sequences.
 	ESC_KEY    = "\x1b"
@@ -76,6 +77,7 @@ type editorImpl struct {
 	mode             EditorMode
 	verbose          bool
 	cursorX, cursorY int
+	commandBuffer    strings.Builder
 }
 
 var _ src.Editor = (*editorImpl)(nil)
@@ -87,6 +89,8 @@ func (e *editorImpl) Handle(key gc.Key) error {
 		return e.handleNormal(key)
 	case INSERT_MODE:
 		return e.handleInsert(key)
+	case COMMAND_MODE:
+		return e.handleCommand(key)
 	default:
 		return nil
 	}
@@ -94,10 +98,6 @@ func (e *editorImpl) Handle(key gc.Key) error {
 
 func (e *editorImpl) handleNormal(key gc.Key) error {
 	switch k := gc.KeyString(key); k {
-	case "q":
-		// Quit the program.
-		e.Close()
-		return io.EOF
 	case "j":
 		// Move the cursor down.
 		e.moveCursorVertical(1)
@@ -124,7 +124,7 @@ func (e *editorImpl) handleNormal(key gc.Key) error {
 		return nil
 	case "L":
 		// Move the cursor to the lowest valid position without scrolling.
-		newY := e.getMaxYForContent() - 1
+		newY := e.getMaxYForContent()
 		if newY+e.fileLineOffset >= len(e.fileContents) {
 			// Special case: we ran out of file. Instead, move the cursor to the last line of the file.
 			newY = len(e.fileContents) - e.fileLineOffset - 1
@@ -165,9 +165,11 @@ func (e *editorImpl) handleNormal(key gc.Key) error {
 		// Swap to INSERT mode.
 		e.swapToInsertMode()
 		return nil
-	case "w":
-		// Write the contents of the in-memory buffer to disc.
-		return e.writeToDisc()
+	case ":":
+		// Swap to CMD mode.
+		e.mode = COMMAND_MODE
+		e.userMsg = ":"
+		return nil
 	default:
 		// Do nothing.
 		return nil
@@ -193,15 +195,17 @@ func (e *editorImpl) moveCursorVertical(dy int) {
 		return
 	}
 
-	// Handle valid scrolling.
+	// Handle valid scrolling. Scrolling also wipes the userMsg.
 	if newY < 0 {
 		// Scroll up one line.
 		e.fileLineOffset -= 1
 		newY = 0
-	} else if newY >= e.getMaxYForContent() {
+		e.userMsg = ""
+	} else if newY > e.getMaxYForContent() {
 		e.fileLineOffset += 1
 		// Keep the cursor on the same line (the last line).
-		newY = e.getMaxYForContent() - 1
+		newY = e.getMaxYForContent()
+		e.userMsg = ""
 	}
 	// Else, we're within the displayed content and can simply update the y-pos.
 	e.cursorY = newY
@@ -337,7 +341,7 @@ func (e *editorImpl) insertChar(ch string) {
 			append([]string{after}, e.fileContents[currLineInd+1:]...)...,
 		)
 		e.cursorX = 0
-		e.cursorY += 1
+		e.moveCursorVertical(1)
 		return
 	}
 	newLine := strings.Builder{}
@@ -348,6 +352,42 @@ func (e *editorImpl) insertChar(ch string) {
 	e.cursorX += 1
 }
 
+func (e *editorImpl) handleCommand(key gc.Key) error {
+	ch := gc.KeyString(key)
+	switch ch {
+	case ESC_KEY:
+		// Cancel the command.
+		e.userMsg = ""
+		e.mode = NORMAL_MODE
+		return nil
+	case "enter":
+		// Trim the beginning ":"
+		command := e.userMsg[1:]
+		e.userMsg = ""
+		defer func() { e.mode = NORMAL_MODE }()
+		return e.handleCommandEntered(command)
+	default:
+		// Just add to command buffer.
+		e.userMsg += ch
+		return nil
+	}
+}
+
+func (e *editorImpl) handleCommandEntered(command string) error {
+	switch command {
+	case "w":
+		// Write the contents of the in-memory buffer to disc, and s
+		return e.writeToDisc()
+	case "q":
+		// Quit the program.
+		e.Close()
+		return io.EOF
+	default:
+		e.userMsg = fmt.Sprintf("unrecognized command: %s", command)
+		return nil
+	}
+}
+
 func (e *editorImpl) Close() {
 	e.file.Close()
 }
@@ -355,7 +395,13 @@ func (e *editorImpl) Close() {
 func (e *editorImpl) sync() {
 	defer e.window.Refresh()
 	defer func() {
-		e.window.Move(e.cursorY, e.normalizeCursorX(e.cursorX))
+		if e.mode == COMMAND_MODE {
+			// Overwrite whatever the cursorY and cursorX are to show the cursor at the bottom of
+			// the screen.
+			e.window.Move(e.getMaxYForContent()+2, len(e.userMsg))
+		} else {
+			e.window.Move(e.cursorY, e.normalizeCursorX(e.cursorX))
+		}
 	}()
 	e.updateWindow()
 }
@@ -367,7 +413,7 @@ func (e *editorImpl) updateWindow() {
 	maxY, maxX := e.window.MaxYX()
 	newWindow, _ := gc.NewWindow(maxY, maxX, windowY, windowX)
 	newWindow.SetBackground(COLOR_PAIR_DEFAULT)
-	for i := range e.getMaxYForContent() {
+	for i := 0; i <= e.getMaxYForContent(); i++ {
 		// We reserve the bottom 2 lines for user messages, and debug messages.
 		if i+e.fileLineOffset < len(e.fileContents) {
 			line := e.fileContents[e.fileLineOffset+i]
@@ -423,8 +469,9 @@ func (e *editorImpl) getCurrLineInd() int {
 
 func (e *editorImpl) getMaxYForContent() int {
 	maxY, _ := e.window.MaxYX()
-	// We reserve the bottom 2 lines for debug and user messages.
-	return maxY - 2
+	// We reserve the bottom 2 lines for debug and user messages. Then we subtract 1 more since this
+	// is an offset.
+	return maxY - 3
 }
 
 // Each string is the entire row. The row does NOT contain the ending newline.
