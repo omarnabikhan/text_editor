@@ -24,7 +24,8 @@ const (
 	INSERT_MODE EditorMode = "INSERT"
 
 	// Escape sequences.
-	ESC_KEY = "\x1B"
+	ESC_KEY    = "\x1b"
+	DELETE_KEY = "\x7f"
 )
 
 func NewEditor(window *gc.Window, filePath string, verbose bool) (src.Editor, error) {
@@ -100,11 +101,35 @@ func (e *editorImpl) handleNormal(key gc.Key) error {
 
 func (e *editorImpl) handleInsert(key gc.Key) error {
 	ch := gc.KeyString(key)
-	if ch == ESC_KEY {
+	switch ch {
+	case ESC_KEY:
 		e.mode = NORMAL_MODE
 		return nil
+	case DELETE_KEY:
+		e.deleteChar()
+		return nil
+	default:
+		e.insertChar(ch)
+		return nil
 	}
+}
 
+// Delete the character BEFORE the cursor position, and decrement the x-position by one.
+func (e *editorImpl) deleteChar() {
+	lineToInsertInto := e.fileContents[e.cursorY]
+	if len(lineToInsertInto) == 0 {
+		// Empty line: do nothing.
+		return
+	}
+	newLine := strings.Builder{}
+	newLine.WriteString(lineToInsertInto[:e.cursorX-1])
+	newLine.WriteString(lineToInsertInto[e.cursorX:])
+	e.fileContents[e.cursorY] = newLine.String()
+	e.cursorX -= 1
+}
+
+// Insert the character at the position of the cursor, and increment the x-position by one.
+func (e *editorImpl) insertChar(ch string) {
 	lineToInsertInto := e.fileContents[e.cursorY]
 	newLine := strings.Builder{}
 	newLine.WriteString(lineToInsertInto[:e.cursorX])
@@ -112,7 +137,6 @@ func (e *editorImpl) handleInsert(key gc.Key) error {
 	newLine.WriteString(lineToInsertInto[e.cursorX:])
 	e.fileContents[e.cursorY] = newLine.String()
 	e.cursorX += 1
-	return nil
 }
 
 func (e *editorImpl) Close() {
