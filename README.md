@@ -40,10 +40,6 @@ The most painful thing so far has been using Colors.
 
 This README has become more of a blog. Maybe I'll update it in a future commit, but for now here it is.
 
-On contributions
---
-No AI code here. This whole thing is a fun side-project to me, so productivity isn't something I'm thinking about.
-
 Status
 --
 I've implemented the basic functionality. Now, there are 3 main (large) projects to do:
