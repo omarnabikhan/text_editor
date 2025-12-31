@@ -37,6 +37,9 @@ More and more, I get confused on if my program is running, or if Vim is running.
 going to challenge myself to come up with features not in Vim that I think are useful and implement them.
 
 The most painful thing so far has been using Colors.
+^^ EDIT: while Colors has been painful, a refactor to make the modes more modular was even more painful. Mainly because I had to think really hard about
+state and what the right separation of state should be. I'm not fully happy with how it's currently implemented, but it's an improvement that will allow
+for more extensibility (e.g. Visual mode). I'm particularly not fond of the x-position updates. I'm sure there is an easier way to do this.
 
 This README has become more of a blog. Maybe I'll update it in a future commit, but for now here it is.
 
