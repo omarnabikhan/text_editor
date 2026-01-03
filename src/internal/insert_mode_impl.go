@@ -128,10 +128,17 @@ func (ie *insertModeEditor) insertChar(ch string) {
 		ie.moveCursorVertical(1)
 		return
 	}
+	cursorDelta := 1
+	if ch == "tab" {
+		// Convert tabs to 4 spaces.
+		ch = "    "
+		cursorDelta = 4
+	}
+	// Convert tabs to 4 spaces.
 	newLine := strings.Builder{}
 	newLine.WriteString(currLine[:ie.cursorX])
 	newLine.WriteString(ch)
 	newLine.WriteString(currLine[ie.cursorX:])
 	ie.fileContents[currLineInd] = newLine.String()
-	ie.moveCursorHorizontal(1, true /*pastLastCharAllowed*/)
+	ie.moveCursorHorizontal(cursorDelta, true /*pastLastCharAllowed*/)
 }
